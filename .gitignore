@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# downloaded binaries (ephemeral — re-downloaded on demand)
+Softwares/
+Softwares.zip
+
+# runtime state files (auto-generated, not source)
+auto-update-log.json
+version-history.json
+version-store.json
+
+# temp / scratch files
+tmp-check-version.js
+
+# editor / OS
+.DS_Store
+.claude/
+
+# environment
+.env

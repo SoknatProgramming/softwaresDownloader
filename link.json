@@ -1,0 +1,56 @@
+[
+  {
+    "softwareName": "Acrobat Reader DC",
+    "linkType": "exe",
+    "linkUrl": "https://ardownload3.adobe.com/pub/adobe/acrobat/win/AcrobatDC/2600121529/AcroRdrDCx642600121529_MUI.exe",
+    "productPageUrl": "https://get.adobe.com/reader/",
+    "versionRegex": "([0-9]{4}\\.[0-9]{3}\\.[0-9]+)",
+    "currentVersion": "2026.001.21529",
+    "localFileName": "Acrobat-Reader-DC-V2026.001.21529.exe",
+    "localDir": "Acrobat-Reader-DC",
+    "localUrl": "/files/Acrobat-Reader-DC/Acrobat-Reader-DC-V2026.001.21529.exe"
+  },
+  {
+    "softwareName": "Firefox",
+    "linkType": "exe",
+    "linkUrl": "https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=en-US",
+    "productPageUrl": "https://product-details.mozilla.org/1.0/firefox_versions.json",
+    "versionRegex": "\"LATEST_FIREFOX_VERSION\":\\s*\"([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)\"",
+    "localFileName": "Firefox-V150.0.1.exe",
+    "localDir": "Firefox",
+    "localUrl": "/files/Firefox/Firefox-V150.0.1.exe"
+  },
+  {
+    "softwareName": "Chrome",
+    "linkType": "msi",
+    "linkUrl": "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",
+    "productPageUrl": "https://chromeenterprise.google/?modal-id=download-chrome#behavior-download-download",
+    "versionRegex": "Chrome version\\s*([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)",
+    "currentVersion": "147.0.7727.138",
+    "localFileName": "Chrome-V147.0.7727.138.msi",
+    "localDir": "Chrome",
+    "localUrl": "/files/Chrome/Chrome-V147.0.7727.138.msi"
+  },
+  {
+    "softwareName": "WinRAR",
+    "linkType": "exe",
+    "linkUrl": "https://www.win-rar.com/fileadmin/winrar-versions/winrar/winrar-x64-722.exe",
+    "productPageUrl": "https://www.win-rar.com/download.html",
+    "versionRegex": "WinRAR\\s*([0-9]+\\.[0-9]+)",
+    "downloadLinkRegex": "href=\"(/fileadmin/winrar-versions/winrar/winrar-x64-\\d+\\.exe)\"",
+    "localFileName": "WinRAR-V7.22.0.exe",
+    "localDir": "WinRAR",
+    "localUrl": "/files/WinRAR/WinRAR-V7.22.0.exe"
+  },
+  {
+    "softwareName": "KeePass",
+    "linkType": "exe",
+    "linkUrl": "https://sourceforge.net/projects/keepass/files/KeePass%202.x/2.61.1/KeePass-2.61.1-Setup.exe/download",
+    "productPageUrl": "https://keepass.info/download.html",
+    "versionRegex": "KeePass\\s+([0-9]+\\.[0-9]+\\.[0-9]+)",
+    "downloadLinkRegex": "href=\"(https://sourceforge\\.net/projects/keepass/files/KeePass%202\\.x/[0-9.]+/KeePass-[0-9.]+-Setup\\.exe/download)\"",
+    "localFileName": "KeePass-V2.61.1.exe",
+    "localDir": "KeePass",
+    "localUrl": "/files/KeePass/KeePass-V2.61.1.exe"
+  }
+]

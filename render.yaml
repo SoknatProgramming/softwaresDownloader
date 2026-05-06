@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: download-softwares-checker
+    env: node
+    buildCommand: npm ci
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 4000
+    disk:
+      name: softwares
+      mountPath: /opt/render/project/src/Softwares
+      sizeGB: 5
