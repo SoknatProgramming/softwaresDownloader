@@ -8,7 +8,7 @@ const scheduler = require('./src/schedulerService');
 const { getStore, compareVersions, compareAll, getVersionDiff } = require('./src/versionStoreService');
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 5050;
 const DOWNLOAD_FOLDER = path.resolve(__dirname, 'Softwares');
 
 app.use(express.json());
