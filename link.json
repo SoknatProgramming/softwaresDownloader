@@ -16,9 +16,10 @@
     "linkUrl": "https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=en-US",
     "productPageUrl": "https://product-details.mozilla.org/1.0/firefox_versions.json",
     "versionRegex": "\"LATEST_FIREFOX_VERSION\":\\s*\"([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)\"",
-    "localFileName": "Firefox-V150.0.1.exe",
+    "localFileName": "Firefox-V150.0.2.exe",
     "localDir": "Firefox",
-    "localUrl": "/files/Firefox/Firefox-V150.0.1.exe"
+    "localUrl": "/files/Firefox/Firefox-V150.0.2.exe",
+    "currentVersion": "150.0.2"
   },
   {
     "softwareName": "Chrome",

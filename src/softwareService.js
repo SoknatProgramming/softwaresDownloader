@@ -31,7 +31,14 @@ function extractVersion(value) {
     return null;
   }
 
-  const matches = [...value.matchAll(VERSION_REGEX)].map((m) => m[0]);
+  let decoded = value;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    // value contains malformed % sequences; scan the original
+  }
+
+  const matches = [...decoded.matchAll(VERSION_REGEX)].map((m) => m[0]);
   const normalizedMatches = matches
     .map((item) => normalizeVersion(item))
     .filter(Boolean);
@@ -206,7 +213,12 @@ function getFinalUrl(response, fallback) {
 
 async function checkSoftwareItem(item) {
   const downloadUrl = await resolveDownloadUrl(item);
-  const currentVersion = item.currentVersion || item.version || extractVersion(downloadUrl) || null;
+  const currentVersion =
+    item.currentVersion ||
+    item.version ||
+    extractVersion(item.localFileName) ||
+    extractVersion(downloadUrl) ||
+    null;
   let latestVersion = currentVersion;
   let resolvedUrl = downloadUrl;
   let headers = {};
