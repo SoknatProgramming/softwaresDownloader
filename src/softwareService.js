@@ -239,6 +239,7 @@ async function checkSoftwareItem(item) {
 
     latestVersion = versionFromPage || versionFromUrl || versionFromHeader || versionFromLocation || latestVersion;
   } catch (error) {
+    const fileSize = await getLocalFileSize(item.localDir, item.localFileName);
     return {
       ...item,
       currentVersion,
@@ -246,12 +247,14 @@ async function checkSoftwareItem(item) {
       resolvedUrl,
       downloadUrl,
       hasNewerVersion: false,
+      fileSize,
       status: 'error',
       error: error.message
     };
   }
 
   const hasNewerVersion = isNewerVersion(currentVersion, latestVersion);
+  const fileSize = await getLocalFileSize(item.localDir, item.localFileName);
 
   return {
     ...item,
@@ -260,6 +263,7 @@ async function checkSoftwareItem(item) {
     hasNewerVersion,
     resolvedUrl,
     downloadUrl,
+    fileSize,
     status: 'ok'
   };
 }
@@ -276,7 +280,8 @@ async function checkSoftwareList(list, options = { persist: false }) {
           hasNewerVersion: updated.hasNewerVersion,
           resolvedUrl: updated.resolvedUrl,
           localFileName: item.localFileName,
-          localUrl: item.localUrl
+          localUrl: item.localUrl,
+          fileSize: updated.fileSize
         };
       }
       return updated;
@@ -296,6 +301,16 @@ function safeFileName(value) {
     .replace(/-+/g, '-')
     .replace(/(^-|-$)/g, '')
     .slice(0, 200);
+}
+
+async function getLocalFileSize(localDir, localFileName) {
+  if (!localDir || !localFileName) return null;
+  try {
+    const stat = await fs.stat(path.join(DOWNLOAD_DIR, localDir, localFileName));
+    return stat.size;
+  } catch {
+    return null;
+  }
 }
 
 async function downloadSoftware(item) {
@@ -326,12 +341,15 @@ async function downloadSoftware(item) {
   const localUrl = `/files/${encodeURIComponent(safeFileName(item.softwareName))}/${encodeURIComponent(targetName)}`;
 
   try {
+    const dir = safeFileName(item.softwareName);
+
     if (await fileExists(filePath)) {
       return {
         message: 'Already downloaded',
         localFileName: targetName,
-        localDir: safeFileName(item.softwareName),
-        localUrl
+        localDir: dir,
+        localUrl,
+        fileSize: await getLocalFileSize(dir, targetName),
       };
     }
 
@@ -347,8 +365,9 @@ async function downloadSoftware(item) {
     return {
       message: 'Downloaded successfully',
       localFileName: targetName,
-      localDir: safeFileName(item.softwareName),
-      localUrl
+      localDir: dir,
+      localUrl,
+      fileSize: await getLocalFileSize(dir, targetName),
     };
   } catch (error) {
     throw new Error(`Download failed: ${error.message}`);
