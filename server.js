@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { loadLinkJson, saveLinkJson, checkSoftwareList, downloadSoftware, ensureDownloadDir } = require('./src/softwareService');
+const { loadLinkJson, saveLinkJson, listSoftwaresFast, checkSoftwareList, downloadSoftware, ensureDownloadDir } = require('./src/softwareService');
 const { recordVersionCheck, getVersionHistory, generateComparisonReport } = require('./src/versionHistoryService');
 const { createSnapshot, getSnapshots, getSnapshot, compareSnapshots, compareWithLatest, deleteSnapshot } = require('./src/snapshotService');
 const { checkAndDownloadAll, getUpdateLog } = require('./src/autoUpdateService');
@@ -17,8 +17,7 @@ app.use('/files', express.static(DOWNLOAD_FOLDER));
 
 app.get('/api/softwares', async (req, res) => {
   try {
-    const list = await loadLinkJson();
-    const result = await checkSoftwareList(list);
+    const result = await listSoftwaresFast();
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });

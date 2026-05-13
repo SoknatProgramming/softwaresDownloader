@@ -39,12 +39,13 @@ function extractVersion(value) {
   }
 
   const matches = [...decoded.matchAll(VERSION_REGEX)].map((m) => m[0]);
-  const normalizedMatches = matches
-    .map((item) => normalizeVersion(item))
-    .filter(Boolean);
+  const pairs = matches
+    .map((raw) => ({ raw, normalized: normalizeVersion(raw) }))
+    .filter((p) => p.normalized);
 
-  if (normalizedMatches.length > 0) {
-    return normalizedMatches.sort(semver.rcompare)[0];
+  if (pairs.length > 0) {
+    pairs.sort((a, b) => semver.rcompare(a.normalized, b.normalized));
+    return pairs[0].raw;
   }
 
   return matches[0] || null;
@@ -69,11 +70,12 @@ function extractVersionFromText(text, regex) {
   }
 
   if (attempts.length > 0) {
-    const normalized = attempts
-      .map((item) => normalizeVersion(item))
-      .filter(Boolean);
-    if (normalized.length > 0) {
-      return normalized.sort(semver.rcompare)[0];
+    const pairs = attempts
+      .map((raw) => ({ raw, normalized: normalizeVersion(raw) }))
+      .filter((p) => p.normalized);
+    if (pairs.length > 0) {
+      pairs.sort((a, b) => semver.rcompare(a.normalized, b.normalized));
+      return pairs[0].raw;
     }
     return attempts[0];
   }
@@ -92,7 +94,8 @@ async function fetchHtml(url) {
     timeout: 15000,
     validateStatus: (status) => status < 500
   });
-  return response.data;
+  const data = response.data;
+  return typeof data === 'string' ? data : JSON.stringify(data);
 }
 
 async function resolveSourceForgeUrl(sfUrl) {
@@ -169,12 +172,27 @@ async function getPageVersion(item) {
   }
 }
 
+function compareVersionParts(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 function isNewerVersion(current, latest) {
   const currentNormalized = normalizeVersion(current);
   const latestNormalized = normalizeVersion(latest);
 
   if (currentNormalized && latestNormalized) {
-    return semver.gt(latestNormalized, currentNormalized);
+    const cmp = semver.compare(latestNormalized, currentNormalized);
+    if (cmp !== 0) return cmp > 0;
+    // semver truncates 4-part versions (e.g. Chrome 148.0.7778.168 → 148.0.7778)
+    // fall back to full numeric part comparison
+    return compareVersionParts(latest, current) > 0;
   }
 
   if (current && latest) {
@@ -268,6 +286,26 @@ async function checkSoftwareItem(item) {
   };
 }
 
+async function listSoftwaresFast() {
+  const list = await loadLinkJson();
+  return Promise.all(
+    list.map(async (item) => {
+      const currentVersion =
+        item.currentVersion || extractVersion(item.localFileName) || null;
+      const stat = await getLocalFileStat(item.localDir, item.localFileName);
+      return {
+        ...item,
+        currentVersion,
+        latestVersion: item.latestVersion || currentVersion,
+        hasNewerVersion: Boolean(item.hasNewerVersion),
+        fileSize: stat?.size ?? null,
+        releaseDate: stat?.mtime?.toISOString() ?? null,
+        status: 'ok',
+      };
+    })
+  );
+}
+
 async function checkSoftwareList(list, options = { persist: false }) {
   const results = await Promise.all(
     list.map(async (item) => {
@@ -303,14 +341,18 @@ function safeFileName(value) {
     .slice(0, 200);
 }
 
-async function getLocalFileSize(localDir, localFileName) {
+async function getLocalFileStat(localDir, localFileName) {
   if (!localDir || !localFileName) return null;
   try {
-    const stat = await fs.stat(path.join(DOWNLOAD_DIR, localDir, localFileName));
-    return stat.size;
+    return await fs.stat(path.join(DOWNLOAD_DIR, localDir, localFileName));
   } catch {
     return null;
   }
+}
+
+async function getLocalFileSize(localDir, localFileName) {
+  const stat = await getLocalFileStat(localDir, localFileName);
+  return stat?.size ?? null;
 }
 
 async function downloadSoftware(item) {
@@ -398,6 +440,7 @@ module.exports = {
   DOWNLOAD_DIR,
   loadLinkJson,
   saveLinkJson,
+  listSoftwaresFast,
   checkSoftwareList,
   checkSoftwareItem,
   downloadSoftware,

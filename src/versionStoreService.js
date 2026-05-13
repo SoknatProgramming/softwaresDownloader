@@ -17,11 +17,27 @@ async function saveStore(data) {
   await fs.writeFile(STORE_FILE, JSON.stringify(data, null, 2) + '\n', 'utf8');
 }
 
+function compareVersionParts(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 function sortHistory(history) {
   return [...history].sort((a, b) => {
     const sv1 = semver.valid(semver.coerce(a.version));
     const sv2 = semver.valid(semver.coerce(b.version));
-    if (sv1 && sv2) return semver.compare(sv1, sv2);
+    if (sv1 && sv2) {
+      const cmp = semver.compare(sv1, sv2);
+      if (cmp !== 0) return cmp;
+      // semver equal after coercion — compare all parts (handles 4-part versions like Chrome)
+      return compareVersionParts(a.version, b.version);
+    }
     return new Date(a.detectedAt) - new Date(b.detectedAt);
   });
 }
@@ -124,7 +140,8 @@ async function getVersionDiff(softwareName, versionA, versionB) {
   const svB = semver.valid(semver.coerce(versionB));
   let direction = 'unknown';
   if (svA && svB) {
-    direction = semver.gt(svB, svA) ? 'upgrade' : semver.lt(svB, svA) ? 'downgrade' : 'same';
+    const cmp = semver.compare(svB, svA) || compareVersionParts(versionB, versionA);
+    direction = cmp > 0 ? 'upgrade' : cmp < 0 ? 'downgrade' : 'same';
   }
 
   return {
