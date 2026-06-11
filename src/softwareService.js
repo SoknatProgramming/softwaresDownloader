@@ -229,6 +229,35 @@ function getFinalUrl(response, fallback) {
   return responseUrl || fallback;
 }
 
+// Size the website reports for the file. Handles both a normal HEAD/GET
+// (content-length) and the Range fallback in fetchUrlMetadata, where the real
+// total lives in content-range ("bytes 0-0/12345").
+function getRemoteSize(headers) {
+  if (!headers) return null;
+  const range = headers['content-range'];
+  if (range) {
+    const m = /\/\s*(\d+)\s*$/.exec(range);
+    if (m) return Number(m[1]);
+    return null; // range request: content-length is the chunk, not the file
+  }
+  const len = headers['content-length'];
+  if (len != null && len !== '') return Number(len);
+  return null;
+}
+
+// The filename we expect on disk for a resolved download URL. Shared by the
+// check (to detect a wrong name) and the download (to write the file).
+function deriveTargetName(item, finalUrl) {
+  const parsed = new URL(finalUrl);
+  const nameFromUrl = path.basename(decodeURIComponent(parsed.pathname));
+  const ext = path.extname(nameFromUrl).replace('.', '') || item.linkType || 'bin';
+  // Prefer the version embedded in the resolved URL — that's the file the
+  // website is actually serving — so the name matches the real content and
+  // stale latest/current fields don't cause spurious name mismatches.
+  const version = extractVersion(finalUrl) || item.latestVersion || item.currentVersion || Date.now();
+  return safeFileName(`${item.softwareName}-V${version}`) + `.${ext}`;
+}
+
 async function checkSoftwareItem(item) {
   const downloadUrl = await resolveDownloadUrl(item);
   const currentVersion =
@@ -266,6 +295,8 @@ async function checkSoftwareItem(item) {
       downloadUrl,
       hasNewerVersion: false,
       fileSize,
+      remoteSize: null,
+      expectedFileName: null,
       status: 'error',
       error: error.message
     };
@@ -273,6 +304,13 @@ async function checkSoftwareItem(item) {
 
   const hasNewerVersion = isNewerVersion(currentVersion, latestVersion);
   const fileSize = await getLocalFileSize(item.localDir, item.localFileName);
+  // What the website says this file should be, so the caller can re-download
+  // when the local copy is missing, the wrong size, or the wrong name.
+  const remoteSize = getRemoteSize(headers);
+  // Use the same version the download will use (the returned latestVersion),
+  // so the expected name matches what downloadSoftware actually writes and we
+  // don't flag a false name mismatch.
+  const expectedFileName = deriveTargetName({ ...item, latestVersion }, resolvedUrl);
 
   return {
     ...item,
@@ -282,6 +320,8 @@ async function checkSoftwareItem(item) {
     resolvedUrl,
     downloadUrl,
     fileSize,
+    remoteSize,
+    expectedFileName,
     status: 'ok'
   };
 }
@@ -360,21 +400,16 @@ async function downloadSoftware(item) {
 
   // Follow redirects to get the real filename and version (e.g. Mozilla's latest-ssl redirect)
   let finalUrl = url;
+  let remoteSize = null;
   try {
     const meta = await fetchUrlMetadata(url);
     finalUrl = getFinalUrl(meta, url);
+    remoteSize = getRemoteSize(meta.headers);
   } catch {
     // keep original url
   }
 
-  const parsed = new URL(finalUrl);
-  const nameFromUrl = path.basename(decodeURIComponent(parsed.pathname));
-  const ext =
-    path.extname(nameFromUrl).replace('.', '') ||
-    item.linkType ||
-    'bin';
-  const version = item.latestVersion || item.currentVersion || extractVersion(finalUrl) || Date.now();
-  const targetName = safeFileName(`${item.softwareName}-V${version}`) + `.${ext}`;
+  const targetName = deriveTargetName(item, finalUrl);
 
   const softwareDir = path.join(DOWNLOAD_DIR, safeFileName(item.softwareName));
   await fs.mkdir(softwareDir, { recursive: true });
@@ -386,20 +421,26 @@ async function downloadSoftware(item) {
     const dir = safeFileName(item.softwareName);
 
     if (await fileExists(filePath)) {
-      return {
-        message: 'Already downloaded',
-        localFileName: targetName,
-        localDir: dir,
-        localUrl,
-        fileSize: await getLocalFileSize(dir, targetName),
-      };
+      const existingSize = await getLocalFileSize(dir, targetName);
+      // Only treat it as already-downloaded if the bytes on disk match what the
+      // website serves; otherwise the local copy is stale/corrupt — re-fetch it.
+      if (remoteSize == null || Number(existingSize) === Number(remoteSize)) {
+        return {
+          message: 'Already downloaded',
+          localFileName: targetName,
+          localDir: dir,
+          localUrl,
+          fileSize: existingSize,
+        };
+      }
     }
 
-    const isSourceForge = url.includes('sourceforge.net');
     const response = await axios.get(url, {
       responseType: 'stream',
       maxRedirects: 10,
-      timeout: isSourceForge ? 120000 : 60000
+      // Binaries can be large (e.g. Acrobat ~800 MB); allow plenty of time so
+      // the stream isn't aborted mid-transfer on slower connections.
+      timeout: 1200000
     });
 
     await pipelineStream(response.data, filePath);
@@ -412,6 +453,8 @@ async function downloadSoftware(item) {
       fileSize: await getLocalFileSize(dir, targetName),
     };
   } catch (error) {
+    // Remove any partial/corrupt file so the next run re-downloads cleanly.
+    await fs.rm(filePath, { force: true }).catch(() => {});
     throw new Error(`Download failed: ${error.message}`);
   }
 }
@@ -444,5 +487,8 @@ module.exports = {
   checkSoftwareList,
   checkSoftwareItem,
   downloadSoftware,
-  ensureDownloadDir
+  ensureDownloadDir,
+  fileExists,
+  getLocalFileSize,
+  deriveTargetName
 };

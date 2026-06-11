@@ -5,7 +5,10 @@ const {
   saveLinkJson,
   checkSoftwareList,
   downloadSoftware,
-  ensureDownloadDir
+  ensureDownloadDir,
+  fileExists,
+  getLocalFileSize,
+  DOWNLOAD_DIR
 } = require('./softwareService');
 const { recordVersionCheck } = require('./versionHistoryService');
 const { recordVersion } = require('./versionStoreService');
@@ -47,8 +50,32 @@ async function checkAndDownloadAll() {
       error: null
     };
 
-    const notYetDownloaded = !item.localFileName;
-    const shouldDownload = item.status !== 'error' && (notYetDownloaded || item.hasNewerVersion);
+    // Re-download when the local copy is missing, the wrong size compared to
+    // what the website reports, or the wrong filename — not just when there's
+    // a newer version.
+    const localPath = item.localFileName
+      ? path.join(DOWNLOAD_DIR, item.localDir || '', item.localFileName)
+      : null;
+    const exists = localPath ? await fileExists(localPath) : false;
+    const localSize = exists ? await getLocalFileSize(item.localDir, item.localFileName) : null;
+
+    const fileMissing = !exists;
+    const sizeWrong =
+      item.remoteSize != null && localSize != null && Number(item.remoteSize) !== Number(localSize);
+    const nameWrong =
+      Boolean(item.expectedFileName) && item.localFileName !== item.expectedFileName;
+
+    const needsDownload = fileMissing || sizeWrong || nameWrong || item.hasNewerVersion;
+    const shouldDownload = item.status !== 'error' && needsDownload;
+    const downloadReason = fileMissing
+      ? 'missing'
+      : sizeWrong
+        ? 'size-mismatch'
+        : nameWrong
+          ? 'name-mismatch'
+          : item.hasNewerVersion
+            ? 'newer-version'
+            : 'none';
 
     if (item.status === 'error') {
       result.action = 'error';
@@ -57,7 +84,8 @@ async function checkAndDownloadAll() {
     } else if (shouldDownload) {
       try {
         const downloaded = await downloadSoftware(item);
-        result.action = notYetDownloaded && !item.hasNewerVersion ? 'initial' : 'updated';
+        result.action = fileMissing && !item.hasNewerVersion ? 'initial' : 'updated';
+        result.reason = downloadReason;
         result.localFile = downloaded.localFileName;
         result.localDir = downloaded.localDir;
         result.localUrl = downloaded.localUrl;
