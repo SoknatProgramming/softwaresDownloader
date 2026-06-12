@@ -91,7 +91,11 @@ async function checkAndDownloadAll() {
         result.localUrl = downloaded.localUrl;
         result.downloadMessage = downloaded.message;
 
-        const idx = list.findIndex((l) => l.softwareName === item.softwareName);
+        // Match on name AND linkType so a software with two formats (e.g. an
+        // exe and an msi of the same name) updates the right entry.
+        const idx = list.findIndex(
+          (l) => l.softwareName === item.softwareName && l.linkType === item.linkType
+        );
         if (idx >= 0) {
           if (item.hasNewerVersion) list[idx].currentVersion = item.latestVersion;
           if (downloaded.localFileName) list[idx].localFileName = downloaded.localFileName;
@@ -101,6 +105,7 @@ async function checkAndDownloadAll() {
 
         await recordVersion(item.softwareName, {
           version: item.latestVersion || item.currentVersion,
+          linkType: item.linkType,
           detectedAt: timestamp,
           downloadedAt: timestamp,
           localFile: `${downloaded.localDir}/${downloaded.localFileName}`,
@@ -122,6 +127,7 @@ async function checkAndDownloadAll() {
     } else {
       await recordVersion(item.softwareName, {
         version: item.latestVersion || item.currentVersion,
+        linkType: item.linkType,
         detectedAt: timestamp,
         downloadUrl: item.resolvedUrl || item.downloadUrl
       });

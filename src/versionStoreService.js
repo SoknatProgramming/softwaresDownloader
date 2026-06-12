@@ -42,21 +42,40 @@ function sortHistory(history) {
   });
 }
 
+// Each download format is tracked under its own key, e.g. "Firefox (exe)" and
+// "Firefox (msi)", so two formats of the same software don't overwrite each
+// other's current version / history.
+function storeKeyFor(softwareName, linkType) {
+  return linkType ? `${softwareName} (${linkType})` : softwareName;
+}
+
+// Resolve a user-supplied name to an actual store key. Falls back to the first
+// "<name> (<format>)" entry so `/api/version-store/Chrome` still works.
+function resolveKey(store, name) {
+  if (store[name]) return name;
+  const prefix = name + ' (';
+  return Object.keys(store).find((k) => k.startsWith(prefix)) || name;
+}
+
 async function recordVersion(softwareName, versionInfo) {
   const store = await loadStore();
   const now = new Date().toISOString();
 
-  if (!store[softwareName]) {
-    store[softwareName] = {
+  const key = storeKeyFor(softwareName, versionInfo.linkType);
+
+  if (!store[key]) {
+    store[key] = {
       current: null,
+      linkType: versionInfo.linkType || null,
       firstSeen: now,
       lastChecked: now,
       history: []
     };
   }
 
-  const entry = store[softwareName];
+  const entry = store[key];
   entry.lastChecked = now;
+  if (versionInfo.linkType) entry.linkType = versionInfo.linkType;
 
   const version = versionInfo.version;
   if (version) {
@@ -84,14 +103,14 @@ async function recordVersion(softwareName, versionInfo) {
 async function getStore(softwareName) {
   const store = await loadStore();
   if (softwareName) {
-    return store[softwareName] || null;
+    return store[resolveKey(store, softwareName)] || null;
   }
   return store;
 }
 
 async function compareVersions(softwareName) {
   const store = await loadStore();
-  const entry = store[softwareName];
+  const entry = store[resolveKey(store, softwareName)];
 
   if (!entry) {
     return { softwareName, error: 'No data found' };
@@ -128,7 +147,7 @@ async function compareAll() {
 
 async function getVersionDiff(softwareName, versionA, versionB) {
   const store = await loadStore();
-  const entry = store[softwareName];
+  const entry = store[resolveKey(store, softwareName)];
   if (!entry) return { error: 'Software not found' };
 
   const a = entry.history.find((h) => h.version === versionA);

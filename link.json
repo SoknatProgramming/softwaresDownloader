@@ -30,15 +30,28 @@
     "fileSize": 67579648
   },
   {
+    "softwareName": "Firefox",
+    "linkType": "msi",
+    "linkUrl": "https://download.mozilla.org/?product=firefox-msi-latest-ssl&os=win64&lang=en-US",
+    "productPageUrl": "https://product-details.mozilla.org/1.0/firefox_versions.json",
+    "versionRegex": "\"LATEST_FIREFOX_VERSION\":\\s*\"([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)\"",
+    "currentVersion": "151.0.4",
+    "latestVersion": "151.0.4",
+    "hasNewerVersion": false,
+    "localFileName": "Firefox-V151.0.4.msi",
+    "localDir": "Firefox",
+    "localUrl": "/files/Firefox/Firefox-V151.0.4.msi"
+  },
+  {
     "softwareName": "Chrome",
     "linkType": "msi",
     "linkUrl": "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",
     "productPageUrl": "https://versionhistory.googleapis.com/v1/chrome/platforms/win64/channels/stable/versions",
     "versionRegex": "\"version\":\\s*\"([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)\"",
-    "currentVersion": "149.0.7827.103",
-    "localFileName": "Chrome-V149.0.7827.103.msi",
+    "currentVersion": "149.0.7827.115",
+    "localFileName": "Chrome-V149.0.7827.115.msi",
     "localDir": "Chrome",
-    "localUrl": "/files/Chrome/Chrome-V149.0.7827.103.msi",
+    "localUrl": "/files/Chrome/Chrome-V149.0.7827.115.msi",
     "latestVersion": "148.0.7778.168",
     "hasNewerVersion": false,
     "resolvedUrl": "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",
@@ -78,5 +91,19 @@
     "downloadUrl": "https://onboardcloud.dl.sourceforge.net/project/keepass/KeePass%202.x/2.61.1/KeePass-2.61.1-Setup.exe?viasf=1&fid=de5286cbce46c534",
     "status": "error",
     "error": "timeout of 30000ms exceeded"
+  },
+  {
+    "softwareName": "K-Lite Codec Pack",
+    "linkType": "exe",
+    "linkUrl": "https://files2.codecguide.com/K-Lite_Codec_Pack_1975_Full.exe",
+    "productPageUrl": "https://codecguide.com/download_k-lite_codec_pack_full.htm",
+    "versionRegex": "Version\\s+([0-9]+\\.[0-9]+\\.[0-9]+)\\s+Full",
+    "downloadLinkRegex": "(https://files[0-9]+\\.codecguide\\.com/K-Lite_Codec_Pack_[0-9]+_Full\\.exe)",
+    "currentVersion": "19.7.5",
+    "latestVersion": "19.7.5",
+    "hasNewerVersion": false,
+    "localFileName": "K-Lite-Codec-Pack-V19.7.5.exe",
+    "localDir": "K-Lite-Codec-Pack",
+    "localUrl": "/files/K-Lite-Codec-Pack/K-Lite-Codec-Pack-V19.7.5.exe"
   }
 ]
