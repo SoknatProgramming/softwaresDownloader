@@ -338,7 +338,9 @@ async function listSoftwaresFast() {
         currentVersion,
         latestVersion: item.latestVersion || currentVersion,
         hasNewerVersion: Boolean(item.hasNewerVersion),
-        fileSize: stat?.size ?? null,
+        // Use the on-disk size when the file is cached locally; otherwise fall
+        // back to the size persisted in link.json so the UI can still show it.
+        fileSize: stat?.size ?? item.fileSize ?? null,
         releaseDate: stat?.mtime?.toISOString() ?? null,
         status: 'ok',
       };

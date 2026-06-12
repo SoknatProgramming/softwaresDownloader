@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const { loadLinkJson, saveLinkJson, listSoftwaresFast, checkSoftwareList, downloadSoftware, ensureDownloadDir } = require('./src/softwareService');
 const { recordVersionCheck, getVersionHistory, generateComparisonReport } = require('./src/versionHistoryService');
 const { createSnapshot, getSnapshots, getSnapshot, compareSnapshots, compareWithLatest, deleteSnapshot } = require('./src/snapshotService');
@@ -253,6 +254,42 @@ app.delete('/api/snapshots/:id', async (req, res) => {
   }
 });
 
+// Inspect the actual files present in the Softwares folder on the server.
+app.get('/api/files-on-disk', (req, res) => {
+  try {
+    const root = DOWNLOAD_FOLDER;
+    const files = [];
+
+    if (fs.existsSync(root)) {
+      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const dirPath = path.join(root, entry.name);
+        for (const name of fs.readdirSync(dirPath)) {
+          const stat = fs.statSync(path.join(dirPath, name));
+          if (!stat.isFile()) continue;
+          files.push({
+            folder: entry.name,
+            file: name,
+            size: stat.size,
+            modified: stat.mtime.toISOString(),
+            url: `/files/${encodeURIComponent(entry.name)}/${encodeURIComponent(name)}`
+          });
+        }
+      }
+    }
+
+    files.sort((a, b) => a.folder.localeCompare(b.folder) || a.file.localeCompare(b.file));
+    res.json({
+      root,
+      count: files.length,
+      totalSize: files.reduce((sum, f) => sum + f.size, 0),
+      files
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/', (req, res) => {
   res.json({
     message: 'Download Softwares Checker API',
@@ -296,7 +333,7 @@ app.get('/', (req, res) => {
         'GET  /api/snapshots/compare-latest',
         'DELETE /api/snapshots/:id'
       ],
-      files: ['GET /files/:filename']
+      files: ['GET /files/:filename', 'GET /api/files-on-disk']
     }
   });
 });
