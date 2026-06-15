@@ -38,6 +38,11 @@ function extractVersion(value) {
     // value contains malformed % sequences; scan the original
   }
 
+  // Drop architecture markers so their digits aren't read as part of the
+  // version, e.g. Telegram's "tsetup-x64.6.9.3.exe" must yield 6.9.3, not
+  // 64.6.9.3. These tokens are never part of a real version number.
+  decoded = decoded.replace(/x86_64|aarch64|amd64|win64|win32|arm64|x64|x86/gi, '');
+
   const matches = [...decoded.matchAll(VERSION_REGEX)].map((m) => m[0]);
   const pairs = matches
     .map((raw) => ({ raw, normalized: normalizeVersion(raw) }))

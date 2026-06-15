@@ -105,5 +105,18 @@
     "localFileName": "K-Lite-Codec-Pack-V19.7.5.exe",
     "localDir": "K-Lite-Codec-Pack",
     "localUrl": "/files/K-Lite-Codec-Pack/K-Lite-Codec-Pack-V19.7.5.exe"
+  },
+  {
+    "softwareName": "Telegram Desktop",
+    "linkType": "exe",
+    "linkUrl": "https://telegram.org/dl/desktop/win64",
+    "currentVersion": "6.9.3",
+    "latestVersion": "6.9.3",
+    "hasNewerVersion": false,
+    "localFileName": "Telegram-Desktop-V6.9.3.exe",
+    "localDir": "Telegram-Desktop",
+    "localUrl": "/files/Telegram-Desktop/Telegram-Desktop-V6.9.3.exe",
+    "resolvedUrl": "https://td.telegram.org/tx64/tsetup-x64.6.9.3.exe",
+    "fileSize": 53088400
   }
 ]
