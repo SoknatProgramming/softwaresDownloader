@@ -14,7 +14,17 @@ let state = {
   lastError: null
 };
 
+let cycleInProgress = false;
+
 async function runCycle() {
+  // A cycle with large downloads can outlast the interval. Starting another on
+  // top of it re-downloads the same files concurrently and corrupts them.
+  if (cycleInProgress) {
+    console.log('[Scheduler] Previous cycle still running — skipping this tick.');
+    return;
+  }
+  cycleInProgress = true;
+
   const now = new Date().toISOString();
   console.log(`[Scheduler] Auto-update cycle started at ${now}`);
   try {
@@ -37,6 +47,8 @@ async function runCycle() {
   } catch (err) {
     state.lastError = err.message;
     console.error(`[Scheduler] Cycle error: ${err.message}`);
+  } finally {
+    cycleInProgress = false;
   }
 }
 

@@ -97,14 +97,21 @@ async function checkAndDownloadAll() {
           (l) => l.softwareName === item.softwareName && l.linkType === item.linkType
         );
         if (idx >= 0) {
-          if (item.hasNewerVersion) list[idx].currentVersion = item.latestVersion;
+          // currentVersion must describe the file at localUrl — clients name
+          // their copy from it — so take it from what was actually downloaded,
+          // also on size/name-mismatch re-downloads, not only newer versions.
+          if (downloaded.version) list[idx].currentVersion = downloaded.version;
+          else if (item.hasNewerVersion) list[idx].currentVersion = item.latestVersion;
           if (downloaded.localFileName) list[idx].localFileName = downloaded.localFileName;
           if (downloaded.localDir) list[idx].localDir = downloaded.localDir;
           if (downloaded.localUrl) list[idx].localUrl = downloaded.localUrl;
+          if (downloaded.fileSize != null) list[idx].fileSize = downloaded.fileSize;
+          list[idx].latestVersion = item.latestVersion;
+          list[idx].hasNewerVersion = false;
         }
 
         await recordVersion(item.softwareName, {
-          version: item.latestVersion || item.currentVersion,
+          version: downloaded.version || item.latestVersion || item.currentVersion,
           linkType: item.linkType,
           detectedAt: timestamp,
           downloadedAt: timestamp,
@@ -158,7 +165,7 @@ async function checkAndDownloadAll() {
     log.runs = log.runs.slice(-MAX_LOG_RUNS);
   }
   log.lastRun = timestamp;
-  log.totalDownloaded = (log.totalDownloaded || 0) + runSummary.downloaded;
+  log.totalDownloaded = (log.totalDownloaded || 0) + runSummary.initial + runSummary.updated;
 
   await saveUpdateLog(log);
 

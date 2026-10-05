@@ -1,5 +1,6 @@
 const fs = require('fs/promises');
 const path = require('path');
+const { pipeline } = require('stream/promises');
 const axios = require('axios');
 const semver = require('semver');
 
@@ -212,6 +213,9 @@ async function fetchUrlMetadata(url) {
   const opts = {
     maxRedirects: isSourceForge ? 10 : 5,
     timeout: isSourceForge ? 30000 : 15000,
+    // Ask for the raw bytes so content-length is the real file size, the same
+    // bytes downloadSoftware writes to disk.
+    headers: { 'Accept-Encoding': 'identity' },
     validateStatus: (status) => status < 500
   };
 
@@ -252,14 +256,18 @@ function getRemoteSize(headers) {
 
 // The filename we expect on disk for a resolved download URL. Shared by the
 // check (to detect a wrong name) and the download (to write the file).
+// Prefer the version embedded in the resolved URL — that's the file the
+// website is actually serving — so the name matches the real content and
+// stale latest/current fields don't cause spurious name mismatches.
+function deriveTargetVersion(item, finalUrl) {
+  return extractVersion(finalUrl) || item.latestVersion || item.currentVersion || null;
+}
+
 function deriveTargetName(item, finalUrl) {
   const parsed = new URL(finalUrl);
   const nameFromUrl = path.basename(decodeURIComponent(parsed.pathname));
   const ext = path.extname(nameFromUrl).replace('.', '') || item.linkType || 'bin';
-  // Prefer the version embedded in the resolved URL — that's the file the
-  // website is actually serving — so the name matches the real content and
-  // stale latest/current fields don't cause spurious name mismatches.
-  const version = extractVersion(finalUrl) || item.latestVersion || item.currentVersion || Date.now();
+  const version = deriveTargetVersion(item, finalUrl) || Date.now();
   return safeFileName(`${item.softwareName}-V${version}`) + `.${ext}`;
 }
 
@@ -402,6 +410,11 @@ async function getLocalFileSize(localDir, localFileName) {
   return stat?.size ?? null;
 }
 
+// Downloads currently in progress, keyed by target file path. A second request
+// for the same file (next scheduler cycle, manual POST) waits on the running
+// one instead of opening the same file again and corrupting it.
+const inFlightDownloads = new Map();
+
 async function downloadSoftware(item) {
   const url = await resolveDownloadUrl(item);
 
@@ -417,52 +430,87 @@ async function downloadSoftware(item) {
   }
 
   const targetName = deriveTargetName(item, finalUrl);
+  const version = deriveTargetVersion(item, finalUrl);
 
-  const softwareDir = path.join(DOWNLOAD_DIR, safeFileName(item.softwareName));
+  const dir = safeFileName(item.softwareName);
+  const softwareDir = path.join(DOWNLOAD_DIR, dir);
   await fs.mkdir(softwareDir, { recursive: true });
 
   const filePath = path.join(softwareDir, targetName);
-  const localUrl = `/files/${encodeURIComponent(safeFileName(item.softwareName))}/${encodeURIComponent(targetName)}`;
+  const localUrl = `/files/${encodeURIComponent(dir)}/${encodeURIComponent(targetName)}`;
+  const result = (message, fileSize) => ({
+    message,
+    version,
+    localFileName: targetName,
+    localDir: dir,
+    localUrl,
+    fileSize
+  });
 
-  try {
-    const dir = safeFileName(item.softwareName);
-
-    if (await fileExists(filePath)) {
-      const existingSize = await getLocalFileSize(dir, targetName);
-      // Only treat it as already-downloaded if the bytes on disk match what the
-      // website serves; otherwise the local copy is stale/corrupt — re-fetch it.
-      if (remoteSize == null || Number(existingSize) === Number(remoteSize)) {
-        return {
-          message: 'Already downloaded',
-          localFileName: targetName,
-          localDir: dir,
-          localUrl,
-          fileSize: existingSize,
-        };
-      }
+  const running = inFlightDownloads.get(filePath);
+  if (running) {
+    try {
+      await running;
+    } catch (error) {
+      throw new Error(`Download failed: ${error.message}`);
     }
+    return result('Already downloaded', await getLocalFileSize(dir, targetName));
+  }
 
+  if (await fileExists(filePath)) {
+    const existingSize = await getLocalFileSize(dir, targetName);
+    // Only treat it as already-downloaded if the bytes on disk match what the
+    // website serves; otherwise the local copy is stale/corrupt — re-fetch it.
+    if (remoteSize == null || Number(existingSize) === Number(remoteSize)) {
+      return result('Already downloaded', existingSize);
+    }
+  }
+
+  const job = fetchToFile(url, filePath, remoteSize);
+  inFlightDownloads.set(filePath, job);
+  try {
+    const fileSize = await job;
+    return result('Downloaded successfully', fileSize);
+  } catch (error) {
+    throw new Error(`Download failed: ${error.message}`);
+  } finally {
+    inFlightDownloads.delete(filePath);
+  }
+}
+
+// Streams url into a ".part" file next to filePath, checks the byte count, then
+// renames it into place. The final name only ever holds a complete file, so
+// /files never serves a half-written installer to clients.
+async function fetchToFile(url, filePath, expectedSize) {
+  const partPath = `${filePath}.part`;
+  try {
     const response = await axios.get(url, {
       responseType: 'stream',
       maxRedirects: 10,
+      decompress: false,
+      headers: { 'Accept-Encoding': 'identity' },
       // Binaries can be large (e.g. Acrobat ~800 MB); allow plenty of time so
       // the stream isn't aborted mid-transfer on slower connections.
       timeout: 1200000
     });
 
-    await pipelineStream(response.data, filePath);
+    const lengthHeader = response.headers['content-length'];
+    const expected =
+      lengthHeader != null && lengthHeader !== '' ? Number(lengthHeader) : expectedSize;
 
-    return {
-      message: 'Downloaded successfully',
-      localFileName: targetName,
-      localDir: dir,
-      localUrl,
-      fileSize: await getLocalFileSize(dir, targetName),
-    };
+    await pipelineStream(response.data, partPath);
+
+    const { size } = await fs.stat(partPath);
+    if (expected != null && size !== Number(expected)) {
+      throw new Error(`incomplete file: got ${size} of ${expected} bytes`);
+    }
+
+    await fs.rename(partPath, filePath);
+    return size;
   } catch (error) {
-    // Remove any partial/corrupt file so the next run re-downloads cleanly.
-    await fs.rm(filePath, { force: true }).catch(() => {});
-    throw new Error(`Download failed: ${error.message}`);
+    // Remove the partial file so the next run re-downloads cleanly.
+    await fs.rm(partPath, { force: true }).catch(() => {});
+    throw error;
   }
 }
 
@@ -475,14 +523,10 @@ async function fileExists(filePath) {
   }
 }
 
+// pipeline closes the file on failure and rejects when the connection drops
+// mid-transfer (premature close), so a short file is never reported as done.
 function pipelineStream(stream, filePath) {
-  return new Promise((resolve, reject) => {
-    const writeStream = require('fs').createWriteStream(filePath);
-    stream.pipe(writeStream);
-    writeStream.on('finish', resolve);
-    writeStream.on('error', reject);
-    stream.on('error', reject);
-  });
+  return pipeline(stream, require('fs').createWriteStream(filePath));
 }
 
 module.exports = {

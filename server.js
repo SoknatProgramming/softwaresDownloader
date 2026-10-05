@@ -50,12 +50,23 @@ app.post('/api/softwares/:name/download', async (req, res) => {
     }
 
     await ensureDownloadDir();
-    const downloaded = await downloadSoftware(item);
+    // Fresh latestVersion first: for URLs without a version (Chrome) the file
+    // is named from it, and the stored value in link.json may be stale.
+    const [checked] = await checkSoftwareList([item]);
+    const downloaded = await downloadSoftware(checked.status === 'ok' ? checked : item);
 
     if (downloaded.localFileName && downloaded.localUrl) {
+      // Keep currentVersion in step with the file at localUrl; clients name
+      // their copy from it.
+      if (downloaded.version) item.currentVersion = downloaded.version;
+      if (checked.status === 'ok') {
+        item.latestVersion = checked.latestVersion;
+        item.hasNewerVersion = false;
+      }
       item.localFileName = downloaded.localFileName;
       item.localDir = downloaded.localDir;
       item.localUrl = downloaded.localUrl;
+      if (downloaded.fileSize != null) item.fileSize = downloaded.fileSize;
       await saveLinkJson(list);
     }
 

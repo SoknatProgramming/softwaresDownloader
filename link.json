@@ -46,7 +46,7 @@
     "softwareName": "Chrome",
     "linkType": "msi",
     "linkUrl": "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",
-    "productPageUrl": "https://versionhistory.googleapis.com/v1/chrome/platforms/win64/channels/stable/versions",
+    "productPageUrl": "https://versionhistory.googleapis.com/v1/chrome/platforms/win64/channels/stable/versions/all/releases?filter=endtime=none,fraction=1",
     "versionRegex": "\"version\":\\s*\"([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)\"",
     "currentVersion": "149.0.7827.115",
     "localFileName": "Chrome-V149.0.7827.115.msi",
