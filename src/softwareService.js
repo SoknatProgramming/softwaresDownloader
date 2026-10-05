@@ -470,11 +470,39 @@ async function downloadSoftware(item) {
   inFlightDownloads.set(filePath, job);
   try {
     const fileSize = await job;
+    if (!extractVersion(finalUrl)) {
+      await removeMislabeledNewer(softwareDir, item.softwareName, targetName, version);
+    }
     return result('Downloaded successfully', fileSize);
   } catch (error) {
     throw new Error(`Download failed: ${error.message}`);
   } finally {
     inFlightDownloads.delete(filePath);
+  }
+}
+
+// When the download URL carries no version (Chrome), the file is named from the
+// version page. Older code read pre-release builds from that page, so files
+// like "Chrome-V155.0.8059.26.msi" actually hold the stable build. Once the
+// real stable file is in place, any same-format file claiming a HIGHER version
+// is one of those mislabeled copies — remove it so nobody takes it as newest.
+async function removeMislabeledNewer(softwareDir, softwareName, keepName, version) {
+  if (!version) return;
+  const prefix = safeFileName(softwareName) + '-V';
+  const ext = path.extname(keepName);
+  let names;
+  try {
+    names = await fs.readdir(softwareDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (name === keepName || !name.startsWith(prefix) || path.extname(name) !== ext) continue;
+    const fileVersion = name.slice(prefix.length, -ext.length);
+    if (compareVersionParts(fileVersion, version) > 0) {
+      await fs.rm(path.join(softwareDir, name), { force: true });
+      console.log(`[Download] Removed mislabeled ${name} (real stable is ${version})`);
+    }
   }
 }
 
